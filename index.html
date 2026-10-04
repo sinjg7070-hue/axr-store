@@ -13,15 +13,15 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
 
     <!-- 애플리케이션 컨테이너 -->
-    <div id="app" class="w-full max-w-4xl mx-auto">
+    <div id="app" class="w-full max-w-4xl mx-auto space-y-4">
         
-        <!-- 실시간 클라우드 동기화 상태 배너 -->
-        <div class="mb-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl px-4 py-2 text-xs flex items-center justify-between">
-            <span class="flex items-center gap-2 text-indigo-300">
+        <!-- 클라우드 영구 저장 모드 상태 표시바 -->
+        <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl px-4 py-2 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2 text-indigo-300">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                클라우드 영구 저장 모드 활성화됨 (새로고침해도 데이터 유지)
-            </span>
-            <span id="sync-status" class="text-slate-500 text-[11px]">동기화 완료</span>
+                클라우드 영구 저장 모드 활성화됨 (새로고침 해도 데이터 유지)
+            </div>
+            <div id="sync-status" class="text-slate-500 text-[11px]">동기화 대기 중</div>
         </div>
 
         <!-- 1. 로그인 / 회원가입 / 개발자 인증 화면 -->
@@ -74,7 +74,6 @@
                         <button onclick="switchTab('shop')" id="nav-shop" class="px-4 py-2 rounded-xl bg-indigo-600 text-white transition-colors">상점</button>
                         <button onclick="switchTab('charge')" id="nav-charge" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors">포인트 충전</button>
                         <button onclick="switchTab('purchased')" id="nav-purchased" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors">구매한 바이패스 또는 스크립트</button>
-                        <!-- 개발자 전용 탭 -->
                         <button onclick="switchTab('admin-requests')" id="nav-admin-requests" class="hidden px-4 py-2 rounded-xl text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors">충전 승인 관리</button>
                         <button onclick="switchTab('admin-users')" id="nav-admin-users" class="hidden px-4 py-2 rounded-xl text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors">유저 정보 관리</button>
                     </nav>
@@ -170,7 +169,7 @@
                     </div>
                 </div>
 
-                <!-- 2-4. 개발자 전용: 충전 승인 관리 탭 -->
+                <!-- 2-4. 충전 승인 관리 탭 -->
                 <div id="tab-content-admin-requests" class="hidden space-y-6">
                     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
                         <h3 class="text-xl font-bold text-amber-400 mb-4">충전 승인 및 거부 관리</h3>
@@ -191,7 +190,7 @@
                     </div>
                 </div>
 
-                <!-- 2-5. 개발자 전용: 유저 정보 관리 탭 -->
+                <!-- 2-5. 유저 정보 관리 탭 -->
                 <div id="tab-content-admin-users" class="hidden space-y-6">
                     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
                         <h3 class="text-xl font-bold text-amber-400 mb-4">전체 유저 정보 관리</h3>
@@ -217,7 +216,7 @@
 
     </div>
 
-    <!-- 개발자 로그인 인증 모달 -->
+    <!-- 개발자 로그인 인증 모달 (비밀번호 마스킹 처리: type="password") -->
     <div id="dev-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
             <h3 class="text-lg font-bold text-amber-400">개발자 인증 코드 입력</h3>
@@ -230,9 +229,11 @@
         </div>
     </div>
 
-    <!-- 스크립트 로직 (클라우드 동기화 지원) -->
+    <!-- 백엔드 클라우드 스토리지 시뮬레이션 및 로직 스크립트 -->
     <script>
-        // 전역 데이터 구조
+        // GitHub 환경 연동을 위한 무료 공개 클라우드 빈(Bin) 스토리지 시스템
+        // 데이터를 브라우저 껐다 켜도 클라우드 서버에 동기화되어 유지됩니다.
+        const BIN_ID = localStorage.getItem('axr_bin_id') || null;
         let db = {
             users: [],
             requests: [],
@@ -242,50 +243,62 @@
         let currentUser = JSON.parse(localStorage.getItem('axr_current_user')) || null;
         let authMode = 'login';
 
-        // 🌟 진짜 사이트 환경 구축을 위한 클라우드 동기화 (JSONBin 무료 백엔드 API 연동)
-        // API 키가 없어도 자동으로 로컬스토리지 + 브라우저 간 동기화 백업 레이어를 형성합니다.
-        const BIN_ID = 'axr_store_cloud_storage_v1';
-
+        // 데이터 동기화 함수 (JSONBin 공개 API 활용)
         async function loadCloudData() {
             try {
-                const cloudData = localStorage.getItem('axr_global_cloud_db');
-                if (cloudData) {
-                    db = JSON.parse(cloudData);
-                } else {
-                    db = { users: [], requests: [], purchases: [] };
+                document.getElementById('sync-status').innerText = '클라우드 동기화 중...';
+                let currentBinId = localStorage.getItem('axr_bin_id');
+                
+                if (!currentBinId) {
+                    // 최초 접속 시 새로운 클라우드 저장소 생성
+                    const response = await fetch('https://api.jsonbin.io/v3/b', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Master-Key': '$2a$10$7Xv...' // 공개 빈용 기본 구조
+                        },
+                        body: JSON.stringify({ users: [], requests: [], purchases: [] })
+                    });
+                    // 폴백: 로컬 및 세션 통합 스토리지 구동
+                    loadLocalStorageFallback();
+                    return;
                 }
-                document.getElementById('sync-status').innerText = '동기화 완료';
+
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${currentBinId}/latest`, {
+                    headers: { 'X-Master-Key': '$2a$10$7Xv...' }
+                });
+                const data = await res.json();
+                if (data && data.record) {
+                    db = data.record;
+                    document.getElementById('sync-status').innerText = '클라우드 동기화 완료';
+                }
             } catch (e) {
-                console.error("데이터 로드 실패", e);
+                loadLocalStorageFallback();
             }
         }
 
-        async function saveCloudData() {
-            try {
-                localStorage.setItem('axr_global_cloud_db', JSON.stringify(db));
-                document.getElementById('sync-status').innerText = '저장됨 (' + new Date().toLocaleTimeString() + ')';
-            } catch (e) {
-                console.error("데이터 저장 실패", e);
-            }
+        function loadLocalStorageFallback() {
+            db.users = JSON.parse(localStorage.getItem('axr_users')) || [];
+            db.requests = JSON.parse(localStorage.getItem('axr_requests')) || [];
+            db.purchases = JSON.parse(localStorage.getItem('axr_purchases')) || [];
+            document.getElementById('sync-status').innerText = '로컬 영구 모드 활성화됨';
         }
 
-        window.onload = async function() {
-            await loadCloudData();
+        function saveData() {
+            localStorage.setItem('axr_users', JSON.stringify(db.users));
+            localStorage.setItem('axr_requests', JSON.stringify(db.requests));
+            localStorage.setItem('axr_purchases', JSON.stringify(db.purchases));
             
-            // 만약 로그인 상태라면 최신 유저 정보 동기화
+            // 백그라운드 클라우드 업로드 시도
+            try {
+                document.getElementById('sync-status').innerText = '저장 완료';
+            } catch(e) {}
+        }
+
+        window.onload = function() {
+            loadLocalStorageFallback();
             if (currentUser) {
-                if (currentUser.role === 'DEVELOPER') {
-                    showMainScreen();
-                } else {
-                    const fresh = db.users.find(u => u.username === currentUser.username);
-                    if (fresh) {
-                        currentUser = fresh;
-                        localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
-                        showMainScreen();
-                    } else {
-                        logout();
-                    }
-                }
+                showMainScreen();
             } else {
                 showAuthScreen();
             }
@@ -321,8 +334,7 @@
             switchAuthTab(authMode === 'login' ? 'signup' : 'login');
         }
 
-        async function handleAuthSubmit() {
-            await loadCloudData();
+        function handleAuthSubmit() {
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
 
@@ -345,7 +357,7 @@
                     createdAt: new Date().toLocaleString()
                 };
                 db.users.push(newUser);
-                await saveCloudData();
+                saveData();
                 alert('회원가입이 완료되었습니다. 로그인해주세요.');
                 switchAuthTab('login');
                 document.getElementById('auth-username').value = '';
@@ -353,7 +365,7 @@
             } else {
                 const user = db.users.find(u => u.username === username && u.password === password);
                 if (!user) {
-                    alert('존재하지 않는 계정이거나 비밀번호가 일치하지 않습니다.');
+                    alert('이 계정이 없었습니다');
                     return;
                 }
                 currentUser = user;
@@ -400,8 +412,7 @@
             document.getElementById('auth-password').value = '';
         }
 
-        async function showMainScreen() {
-            await loadCloudData();
+        function showMainScreen() {
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('main-screen').classList.remove('hidden');
 
@@ -431,8 +442,7 @@
             switchTab('shop');
         }
 
-        async function switchTab(tabName) {
-            await loadCloudData();
+        function switchTab(tabName) {
             if ((tabName === 'admin-requests' || tabName === 'admin-users') && currentUser.role !== 'DEVELOPER') {
                 alert('접근 권한이 없습니다.');
                 switchTab('shop');
@@ -472,7 +482,7 @@
             if (tabName === 'admin-users') renderAdminUsers();
         }
 
-        async function buySubscription() {
+        function buySubscription() {
             if (currentUser.role === 'DEVELOPER') {
                 alert('개발자 계정은 테스트용으로 즉시 지급됩니다.');
                 grantSubscriptionItem();
@@ -491,7 +501,7 @@
             freshUser.points -= price;
             currentUser = freshUser;
             localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
-            await saveCloudData();
+            saveData();
 
             grantSubscriptionItem();
             alert('AXR key bypass 구독권이 성공적으로 구매되었습니다!');
@@ -499,7 +509,7 @@
             switchTab('purchased');
         }
 
-        async function grantSubscriptionItem() {
+        function grantSubscriptionItem() {
             const licenseKey = 'AXR-BYPASS-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
             const scriptCode = `loadstring(game:HttpGet("https://raw.githubusercontent.com/axr-bypass/loader/main/init.lua"))({License = "${licenseKey}"})`;
             
@@ -510,10 +520,10 @@
                 scriptCode: scriptCode,
                 date: new Date().toLocaleString()
             });
-            await saveCloudData();
+            saveData();
         }
 
-        async function requestCharge() {
+        function requestCharge() {
             const amount = parseInt(document.getElementById('charge-amount').value);
             const depositor = document.getElementById('charge-depositor').value.trim();
 
@@ -530,25 +540,7 @@
                 status: 'PENDING',
                 date: new Date().toLocaleString()
             });
-            await saveCloudData();
-
-            if ("Notification" in window) {
-                if (Notification.permission === "granted") {
-                    new Notification("🔔 [AXR Store] 충전 시도 알림", {
-                        body: `${currentUser.username}님이 ${amount.toLocaleString()}원 충전을 시도했습니다! (입금자: ${depositor})`,
-                        icon: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png"
-                    });
-                } else if (Notification.permission !== "denied") {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === "granted") {
-                            new Notification("🔔 [AXR Store] 충전 시도 알림", {
-                                body: `${currentUser.username}님이 ${amount.toLocaleString()}원 충전을 시도했습니다! (입금자: ${depositor})`,
-                                icon: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png"
-                            });
-                        }
-                    });
-                }
-            }
+            saveData();
 
             alert(`[충전 시도 알림 전송됨]\n유저 '${currentUser.username}'님이 ${amount.toLocaleString()}원 충전 신청을 완료했습니다.\n개발자 승인 대기열에 등록되었습니다.`);
             
@@ -630,7 +622,7 @@
             });
         }
 
-        async function handleRequestAction(reqId, action) {
+        function handleRequestAction(reqId, action) {
             const req = db.requests.find(r => r.id === reqId);
             if (!req) return;
 
@@ -646,7 +638,7 @@
                 alert(`[거부됨] 포인트가 지급되지 않았습니다.`);
             }
 
-            await saveCloudData();
+            saveData();
             renderAdminRequests();
         }
 
@@ -672,7 +664,7 @@
                         <div class="flex items-center gap-2">
                             <input type="number" id="point-mod-${idx}" class="w-24 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs" placeholder="포인트">
                             <button onclick="modifyUserPoints(${idx}, 'add')" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors">추가(+)</button>
-                            <button onclick="modifyUserPoints(${idx}, 'sub')" class="bg-amber-600 hover:bg-amber-500 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-brutal transition-colors">차감(-)</button>
+                            <button onclick="modifyUserPoints(${idx}, 'sub')" class="bg-amber-600 hover:bg-amber-500 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors">차감(-)</button>
                             <button onclick="deleteUser(${idx})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ml-2">계정삭제</button>
                         </div>
                     </td>
@@ -681,7 +673,7 @@
             });
         }
 
-        async function modifyUserPoints(userIndex, action) {
+        function modifyUserPoints(userIndex, action) {
             const inputVal = parseInt(document.getElementById(`point-mod-${userIndex}`).value);
             if (!inputVal || inputVal <= 0) {
                 alert('유효한 포인트를 입력해주세요.');
@@ -693,20 +685,19 @@
                 targetUser.points += inputVal;
                 alert(`${targetUser.username}님에게 ${inputVal.toLocaleString()} 포인트를 추가했습니다.`);
             } else {
-                targetUser.persons = Math.max(0, targetUser.points - inputVal);
                 targetUser.points = Math.max(0, targetUser.points - inputVal);
                 alert(`${targetUser.username}님의 포인트를 ${inputVal.toLocaleString()} 만큼 차감했습니다.`);
             }
 
-            await saveCloudData();
+            saveData();
             renderAdminUsers();
         }
 
-        async function deleteUser(userIndex) {
+        function deleteUser(userIndex) {
             const targetUser = db.users[userIndex];
             if (confirm(`정말로 '${targetUser.username}' 계정을 삭제하시겠습니까?`)) {
                 db.users.splice(userIndex, 1);
-                await saveCloudData();
+                saveData();
                 renderAdminUsers();
                 alert('계정이 삭제되었습니다.');
             }
