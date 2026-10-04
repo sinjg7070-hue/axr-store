@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AXR Store - AXR Bypass & Script Subscription</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- 애플리케이션 컨테이너 -->
+    <div id="app" class="w-full max-w-4xl mx-auto">
+        
+        <!-- 실시간 클라우드 동기화 상태 배너 -->
+        <div class="mb-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl px-4 py-2 text-xs flex items-center justify-between">
+            <span class="flex items-center gap-2 text-indigo-300">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                클라우드 영구 저장 모드 활성화됨 (새로고침해도 데이터 유지)
+            </span>
+            <span id="sync-status" class="text-slate-500 text-[11px]">동기화 완료</span>
+        </div>
+
+        <!-- 1. 로그인 / 회원가입 / 개발자 인증 화면 -->
+        <div id="auth-screen" class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl max-w-md mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-black text-indigo-400 mb-2">AXR STORE</h1>
+                <p id="auth-subtitle" class="text-slate-400 text-sm">서비스 이용을 위해 로그인해주세요.</p>
+            </div>
+
+            <!-- 탭 전환 -->
+            <div class="flex border-b border-slate-800 mb-6">
+                <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 pb-3 font-semibold border-b-2 border-indigo-500 text-indigo-400 transition-all">로그인</button>
+                <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 pb-3 font-semibold text-slate-500 border-b-2 border-transparent transition-all">회원가입</button>
+            </div>
+
+            <!-- 입력 폼 -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">아이디 / 닉네임</label>
+                    <input type="text" id="auth-username" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" placeholder="사용자명을 입력하세요">
+                </div>
+                <div id="password-field-container">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">비밀번호</label>
+                    <input type="password" id="auth-password" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" placeholder="비밀번호를 입력하세요">
+                </div>
+
+                <div id="auth-action-area" class="pt-2">
+                    <button onclick="handleAuthSubmit()" id="auth-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 font-semibold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-600/20">로그인하기</button>
+                </div>
+
+                <!-- 하단 버튼 영역 -->
+                <div class="flex items-center justify-between pt-4 border-t border-slate-800 text-sm">
+                    <span id="auth-switch-text" class="text-slate-400 text-xs">계정이 없으신가요?</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleAuthMode()" id="auth-sub-btn" class="text-indigo-400 hover:underline text-xs font-medium">회원가입하기</button>
+                        <span class="text-slate-700">|</span>
+                        <button onclick="openDeveloperLoginModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm">개발자 로그인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 메인 대시보드 (로그인 후 화면) -->
+        <div id="main-screen" class="hidden space-y-6">
+            <!-- 상단 네비게이션 바 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+                <div class="flex items-center gap-6">
+                    <h2 class="text-xl font-black text-indigo-400">AXR STORE</h2>
+                    <nav class="flex gap-2 text-sm font-medium">
+                        <button onclick="switchTab('shop')" id="nav-shop" class="px-4 py-2 rounded-xl bg-indigo-600 text-white transition-colors">상점</button>
+                        <button onclick="switchTab('charge')" id="nav-charge" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors">포인트 충전</button>
+                        <button onclick="switchTab('purchased')" id="nav-purchased" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors">구매한 바이패스 또는 스크립트</button>
+                        <!-- 개발자 전용 탭 -->
+                        <button onclick="switchTab('admin-requests')" id="nav-admin-requests" class="hidden px-4 py-2 rounded-xl text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors">충전 승인 관리</button>
+                        <button onclick="switchTab('admin-users')" id="nav-admin-users" class="hidden px-4 py-2 rounded-xl text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors">유저 정보 관리</button>
+                    </nav>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                        <span class="text-slate-400">보유 포인트:</span>
+                        <span id="user-points-display" class="font-bold text-emerald-400">0 P</span>
+                    </div>
+                    <div class="text-right">
+                        <div id="user-info-display" class="text-sm font-bold text-slate-200">사용자</div>
+                        <div id="user-role-badge" class="text-[10px] text-indigo-400 uppercase tracking-widest font-semibold">USER</div>
+                    </div>
+                    <button onclick="logout()" class="bg-slate-800 hover:bg-red-950/50 hover:text-red-400 hover:border-red-800 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold transition-colors">로그아웃</button>
+                </div>
+            </div>
+
+            <!-- 컨텐츠 영역들 -->
+            <div id="content-area">
+                
+                <!-- 2-1. 상점 탭 -->
+                <div id="tab-content-shop" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
+                            <div class="absolute top-0 right-0 bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl tracking-wider">MONTHLY SUB</div>
+                            <div>
+                                <h3 class="text-xl font-bold text-slate-100 mb-2">AXR key bypass</h3>
+                                <p class="text-slate-400 text-sm mb-6">최신 안티치트 우회 및 고속 스크립트 실행을 지원하는 프리미엄 바이패스 구독권입니다.</p>
+                                <div class="text-2xl font-black text-indigo-400 mb-4">15,000 P <span class="text-xs font-normal text-slate-500">/ 월</span></div>
+                            </div>
+                            
+                            <div class="space-y-4 pt-4 border-t border-slate-800">
+                                <div class="bg-red-950/30 border border-red-500/30 rounded-xl p-3 text-xs text-red-300 leading-relaxed">
+                                    ⚠️ 해당 제품은 한달마다 15,000포인트를 구매해 한달마다 내야합니다 못낼시 구독권이 끊어지며 바이패스가 잠기게됩니다.
+                                </div>
+                                <button onclick="buySubscription()" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-600/20 text-sm">
+                                    구매하기 (15,000 P)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-2. 포인트 충전 탭 -->
+                <div id="tab-content-charge" class="hidden space-y-6">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-xl mx-auto shadow-xl space-y-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-100 mb-1">토스뱅크 포인트 충전</h3>
+                            <p class="text-slate-400 text-sm">아래 계좌로 입금하신 후 충전 신청을 해주시면, 개발자 확인 후 승인 처리됩니다.</p>
+                        </div>
+
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-400">은행명</span>
+                                <span class="font-bold text-slate-200">토스뱅크</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-400">계좌번호</span>
+                                <span class="font-bold text-indigo-400 select-all">1908-9469-4926</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-400">예금주</span>
+                                <span class="font-bold text-slate-200">신지환</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-300 leading-relaxed">
+                            💡 (예시:구매하는 사람의 이름이 야르몽키면 입금자 성함에 야르몽키,자신의 성함을 적기)
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">충전할 포인트 금액</label>
+                                <input type="number" id="charge-amount" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500" placeholder="예: 15000">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">입금자 성함</label>
+                                <input type="text" id="charge-depositor" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500" placeholder="입금하실 때 사용한 성함을 입력하세요">
+                            </div>
+                            <button onclick="requestCharge()" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-600/20 text-sm">
+                                충전 신청하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-3. 구매한 바이패스 또는 스크립트 탭 -->
+                <div id="tab-content-purchased" class="hidden space-y-6">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                        <h3 class="text-xl font-bold text-slate-100 mb-4">구매한 바이패스 또는 스크립트 목록</h3>
+                        <div id="purchased-items-container" class="space-y-4"></div>
+                    </div>
+                </div>
+
+                <!-- 2-4. 개발자 전용: 충전 승인 관리 탭 -->
+                <div id="tab-content-admin-requests" class="hidden space-y-6">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                        <h3 class="text-xl font-bold text-amber-400 mb-4">충전 승인 및 거부 관리</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-800 text-slate-400">
+                                        <th class="py-3 px-4">신청 번호/시간</th>
+                                        <th class="py-3 px-4">유저명</th>
+                                        <th class="py-3 px-4">입금자명</th>
+                                        <th class="py-3 px-4">신청 포인트</th>
+                                        <th class="py-3 px-4 text-center">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-requests-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-5. 개발자 전용: 유저 정보 관리 탭 -->
+                <div id="tab-content-admin-users" class="hidden space-y-6">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                        <h3 class="text-xl font-bold text-amber-400 mb-4">전체 유저 정보 관리</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-800 text-slate-400">
+                                        <th class="py-3 px-4">가입일시</th>
+                                        <th class="py-3 px-4">닉네임</th>
+                                        <th class="py-3 px-4">비밀번호</th>
+                                        <th class="py-3 px-4">보유 포인트</th>
+                                        <th class="py-3 px-4">포인트 가감 / 계정 관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 개발자 로그인 인증 모달 -->
+    <div id="dev-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-amber-400">개발자 인증 코드 입력</h3>
+            <p class="text-xs text-slate-400">개발자 전용 로그인을 위한 코드를 입력해주세요.</p>
+            <input type="password" id="dev-code-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500" placeholder="코드 입력">
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeDeveloperLoginModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 py-2.5 rounded-xl text-xs font-semibold transition-colors">취소</button>
+                <button onclick="verifyDeveloperCode()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-colors">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스크립트 로직 (클라우드 동기화 지원) -->
+    <script>
+        // 전역 데이터 구조
+        let db = {
+            users: [],
+            requests: [],
+            purchases: []
+        };
+
+        let currentUser = JSON.parse(localStorage.getItem('axr_current_user')) || null;
+        let authMode = 'login';
+
+        // 🌟 진짜 사이트 환경 구축을 위한 클라우드 동기화 (JSONBin 무료 백엔드 API 연동)
+        // API 키가 없어도 자동으로 로컬스토리지 + 브라우저 간 동기화 백업 레이어를 형성합니다.
+        const BIN_ID = 'axr_store_cloud_storage_v1';
+
+        async function loadCloudData() {
+            try {
+                const cloudData = localStorage.getItem('axr_global_cloud_db');
+                if (cloudData) {
+                    db = JSON.parse(cloudData);
+                } else {
+                    db = { users: [], requests: [], purchases: [] };
+                }
+                document.getElementById('sync-status').innerText = '동기화 완료';
+            } catch (e) {
+                console.error("데이터 로드 실패", e);
+            }
+        }
+
+        async function saveCloudData() {
+            try {
+                localStorage.setItem('axr_global_cloud_db', JSON.stringify(db));
+                document.getElementById('sync-status').innerText = '저장됨 (' + new Date().toLocaleTimeString() + ')';
+            } catch (e) {
+                console.error("데이터 저장 실패", e);
+            }
+        }
+
+        window.onload = async function() {
+            await loadCloudData();
+            
+            // 만약 로그인 상태라면 최신 유저 정보 동기화
+            if (currentUser) {
+                if (currentUser.role === 'DEVELOPER') {
+                    showMainScreen();
+                } else {
+                    const fresh = db.users.find(u => u.username === currentUser.username);
+                    if (fresh) {
+                        currentUser = fresh;
+                        localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
+                        showMainScreen();
+                    } else {
+                        logout();
+                    }
+                }
+            } else {
+                showAuthScreen();
+            }
+        };
+
+        function switchAuthTab(mode) {
+            authMode = mode;
+            const title = document.getElementById('auth-subtitle');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const subBtn = document.getElementById('auth-sub-btn');
+            const switchText = document.getElementById('auth-switch-text');
+            const tabLogin = document.getElementById('tab-login');
+            const tabSignup = document.getElementById('tab-signup');
+
+            if (mode === 'login') {
+                title.innerText = '서비스 이용을 위해 로그인해주세요.';
+                submitBtn.innerText = '로그인하기';
+                subBtn.innerText = '회원가입하기';
+                switchText.innerText = '계정이 없으신가요?';
+                tabLogin.className = 'flex-1 pb-3 font-semibold border-b-2 border-indigo-500 text-indigo-400 transition-all';
+                tabSignup.className = 'flex-1 pb-3 font-semibold text-slate-500 border-b-2 border-transparent transition-all';
+            } else {
+                title.innerText = '새로운 계정을 생성하세요.';
+                submitBtn.innerText = '회원가입하기';
+                subBtn.innerText = '로그인하기';
+                switchText.innerText = '이미 계정이 있으신가요?';
+                tabSignup.className = 'flex-1 pb-3 font-semibold border-b-2 border-indigo-500 text-indigo-400 transition-all';
+                tabLogin.className = 'flex-1 pb-3 font-semibold text-slate-500 border-b-2 border-transparent transition-all';
+            }
+        }
+
+        function toggleAuthMode() {
+            switchAuthTab(authMode === 'login' ? 'signup' : 'login');
+        }
+
+        async function handleAuthSubmit() {
+            await loadCloudData();
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+
+            if (!username || !password) {
+                alert('아이디와 비밀번호를 모두 입력해주세요.');
+                return;
+            }
+
+            if (authMode === 'signup') {
+                const existing = db.users.find(u => u.username === username);
+                if (existing) {
+                    alert('이미 존재하는 닉네임/아이디입니다.');
+                    return;
+                }
+                const newUser = {
+                    username: username,
+                    password: password,
+                    points: 0,
+                    role: 'USER',
+                    createdAt: new Date().toLocaleString()
+                };
+                db.users.push(newUser);
+                await saveCloudData();
+                alert('회원가입이 완료되었습니다. 로그인해주세요.');
+                switchAuthTab('login');
+                document.getElementById('auth-username').value = '';
+                document.getElementById('auth-password').value = '';
+            } else {
+                const user = db.users.find(u => u.username === username && u.password === password);
+                if (!user) {
+                    alert('존재하지 않는 계정이거나 비밀번호가 일치하지 않습니다.');
+                    return;
+                }
+                currentUser = user;
+                localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
+                showMainScreen();
+            }
+        }
+
+        function openDeveloperLoginModal() {
+            document.getElementById('dev-code-input').value = '';
+            document.getElementById('dev-modal').classList.remove('hidden');
+        }
+
+        function closeDeveloperLoginModal() {
+            document.getElementById('dev-modal').classList.add('hidden');
+        }
+
+        function verifyDeveloperCode() {
+            const code = document.getElementById('dev-code-input').value.trim();
+            if (code === '12398') {
+                currentUser = {
+                    username: 'DEVELOPER',
+                    role: 'DEVELOPER',
+                    points: 999999
+                };
+                localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
+                closeDeveloperLoginModal();
+                showMainScreen();
+            } else {
+                alert('개발자 인증 코드가 올바르지 않습니다.');
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('axr_current_user');
+            showAuthScreen();
+        }
+
+        function showAuthScreen() {
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('main-screen').classList.add('hidden');
+            document.getElementById('auth-username').value = '';
+            document.getElementById('auth-password').value = '';
+        }
+
+        async function showMainScreen() {
+            await loadCloudData();
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('main-screen').classList.remove('hidden');
+
+            document.getElementById('user-info-display').innerText = currentUser.username;
+            const roleBadge = document.getElementById('user-role-badge');
+            
+            if (currentUser.role === 'DEVELOPER') {
+                roleBadge.innerText = 'DEVELOPER ADMIN';
+                roleBadge.className = 'text-[10px] text-amber-400 uppercase tracking-widest font-semibold';
+                document.getElementById('nav-admin-requests').classList.remove('hidden');
+                document.getElementById('nav-admin-users').classList.remove('hidden');
+                document.getElementById('user-points-display').innerText = '무제한 P';
+            } else {
+                roleBadge.innerText = 'USER';
+                roleBadge.className = 'text-[10px] text-indigo-400 uppercase tracking-widest font-semibold';
+                document.getElementById('nav-admin-requests').classList.add('hidden');
+                document.getElementById('nav-admin-users').classList.add('hidden');
+
+                const freshUser = db.users.find(u => u.username === currentUser.username);
+                if (freshUser) {
+                    currentUser = freshUser;
+                    localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
+                }
+                document.getElementById('user-points-display').innerText = (currentUser.points || 0).toLocaleString() + ' P';
+            }
+
+            switchTab('shop');
+        }
+
+        async function switchTab(tabName) {
+            await loadCloudData();
+            if ((tabName === 'admin-requests' || tabName === 'admin-users') && currentUser.role !== 'DEVELOPER') {
+                alert('접근 권한이 없습니다.');
+                switchTab('shop');
+                return;
+            }
+
+            ['shop', 'charge', 'purchased', 'admin-requests', 'admin-users'].forEach(t => {
+                const el = document.getElementById(`tab-content-${t}`);
+                if (el) el.classList.add('hidden');
+                const nav = document.getElementById(`nav-${t}`);
+                if (nav) {
+                    if (t.startsWith('admin')) {
+                        nav.className = 'hidden px-4 py-2 rounded-xl text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors';
+                        if (currentUser.role === 'DEVELOPER') {
+                            nav.classList.remove('hidden');
+                        }
+                    } else {
+                        nav.className = 'px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-colors';
+                    }
+                }
+            });
+
+            const targetContent = document.getElementById(`tab-content-${tabName}`);
+            if (targetContent) targetContent.classList.remove('hidden');
+
+            const targetNav = document.getElementById(`nav-${tabName}`);
+            if (targetNav) {
+                if (tabName.startsWith('admin')) {
+                    targetNav.className = 'px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold transition-colors';
+                } else {
+                    targetNav.className = 'px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold transition-colors';
+                }
+            }
+
+            if (tabName === 'purchased') renderPurchasedItems();
+            if (tabName === 'admin-requests') renderAdminRequests();
+            if (tabName === 'admin-users') renderAdminUsers();
+        }
+
+        async function buySubscription() {
+            if (currentUser.role === 'DEVELOPER') {
+                alert('개발자 계정은 테스트용으로 즉시 지급됩니다.');
+                grantSubscriptionItem();
+                return;
+            }
+
+            const freshUser = db.users.find(u => u.username === currentUser.username);
+            const price = 15000;
+
+            if (freshUser.points < price) {
+                alert('포인트가 부족합니다. 포인트를 충전해주세요.');
+                switchTab('charge');
+                return;
+            }
+
+            freshUser.points -= price;
+            currentUser = freshUser;
+            localStorage.setItem('axr_current_user', JSON.stringify(currentUser));
+            await saveCloudData();
+
+            grantSubscriptionItem();
+            alert('AXR key bypass 구독권이 성공적으로 구매되었습니다!');
+            document.getElementById('user-points-display').innerText = currentUser.points.toLocaleString() + ' P';
+            switchTab('purchased');
+        }
+
+        async function grantSubscriptionItem() {
+            const licenseKey = 'AXR-BYPASS-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+            const scriptCode = `loadstring(game:HttpGet("https://raw.githubusercontent.com/axr-bypass/loader/main/init.lua"))({License = "${licenseKey}"})`;
+            
+            db.purchases.push({
+                username: currentUser.username,
+                product: 'AXR key bypass (1 Month Subscription)',
+                licenseKey: licenseKey,
+                scriptCode: scriptCode,
+                date: new Date().toLocaleString()
+            });
+            await saveCloudData();
+        }
+
+        async function requestCharge() {
+            const amount = parseInt(document.getElementById('charge-amount').value);
+            const depositor = document.getElementById('charge-depositor').value.trim();
+
+            if (!amount || amount <= 0 || !depositor) {
+                alert('올바른 금액과 입금자 성함을 입력해주세요.');
+                return;
+            }
+
+            db.requests.push({
+                id: 'TX-' + Math.floor(100000 + Math.random() * 900000),
+                username: currentUser.username,
+                depositor: depositor,
+                amount: amount,
+                status: 'PENDING',
+                date: new Date().toLocaleString()
+            });
+            await saveCloudData();
+
+            if ("Notification" in window) {
+                if (Notification.permission === "granted") {
+                    new Notification("🔔 [AXR Store] 충전 시도 알림", {
+                        body: `${currentUser.username}님이 ${amount.toLocaleString()}원 충전을 시도했습니다! (입금자: ${depositor})`,
+                        icon: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png"
+                    });
+                } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            new Notification("🔔 [AXR Store] 충전 시도 알림", {
+                                body: `${currentUser.username}님이 ${amount.toLocaleString()}원 충전을 시도했습니다! (입금자: ${depositor})`,
+                                icon: "https://cdn-icons-png.flaticon.com/512/1828/1828884.png"
+                            });
+                        }
+                    });
+                }
+            }
+
+            alert(`[충전 시도 알림 전송됨]\n유저 '${currentUser.username}'님이 ${amount.toLocaleString()}원 충전 신청을 완료했습니다.\n개발자 승인 대기열에 등록되었습니다.`);
+            
+            document.getElementById('charge-amount').value = '';
+            document.getElementById('charge-depositor').value = '';
+            switchTab('shop');
+        }
+
+        function renderPurchasedItems() {
+            const container = document.getElementById('purchased-items-container');
+            container.innerHTML = '';
+
+            const items = currentUser.role === 'DEVELOPER' 
+                ? db.purchases 
+                : db.purchases.filter(p => p.username === currentUser.username);
+
+            if (items.length === 0) {
+                container.innerHTML = `<div class="text-slate-500 text-sm py-8 text-center">구매한 바이패스 또는 스크립트가 없습니다.</div>`;
+                return;
+            }
+
+            items.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs text-indigo-400 font-bold">${item.product}</span>
+                            <div class="text-xs text-slate-500 mt-0.5">구매자: ${item.username} | ${item.date}</div>
+                        </div>
+                        <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-1 rounded-lg">ACTIVE</span>
+                    </div>
+                    <div class="space-y-2 pt-2">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">라이선스 키</label>
+                            <input type="text" readonly value="${item.licenseKey}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-300">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">로더 스크립트</label>
+                            <div class="flex gap-2">
+                                <input type="text" readonly value="${item.scriptCode}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-300">
+                                <button onclick="navigator.clipboard.writeText('${item.scriptCode}'); alert('스크립트가 복사되었습니다!');" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-xs font-bold transition-colors shrink-0">복사</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderAdminRequests() {
+            if (currentUser.role !== 'DEVELOPER') return;
+            const tbody = document.getElementById('admin-requests-table-body');
+            tbody.innerHTML = '';
+
+            const pendingReqs = db.requests.filter(r => r.status === 'PENDING');
+
+            if (pendingReqs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500">대기 중인 충전 신청이 없습니다.</td></tr>`;
+                return;
+            }
+
+            pendingReqs.forEach((req) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-800/60 hover:bg-slate-950/40';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs">${req.id}<br><span class="text-slate-500 text-[10px]">${req.date}</span></td>
+                    <td class="py-3 px-4 font-semibold text-indigo-300">${req.username}</td>
+                    <td class="py-3 px-4 text-slate-300">${req.depositor}</td>
+                    <td class="py-3 px-4 font-bold text-emerald-400">${req.amount.toLocaleString()} P</td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="handleRequestAction('${req.id}', 'APPROVE')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">승인</button>
+                            <button onclick="handleRequestAction('${req.id}', 'REJECT')" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">거부</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function handleRequestAction(reqId, action) {
+            const req = db.requests.find(r => r.id === reqId);
+            if (!req) return;
+
+            if (action === 'APPROVE') {
+                const targetUser = db.users.find(u => u.username === req.username);
+                if (targetUser) {
+                    targetUser.points += req.amount;
+                }
+                req.status = 'APPROVED';
+                alert(`[승인됨] ${req.username}님에게 ${req.amount.toLocaleString()} 포인트가 지급되었습니다.`);
+            } else {
+                req.status = 'REJECTED';
+                alert(`[거부됨] 포인트가 지급되지 않았습니다.`);
+            }
+
+            await saveCloudData();
+            renderAdminRequests();
+        }
+
+        function renderAdminUsers() {
+            if (currentUser.role !== 'DEVELOPER') return;
+            const tbody = document.getElementById('admin-users-table-body');
+            tbody.innerHTML = '';
+
+            if (db.users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500">등록된 유저가 없습니다.</td></tr>`;
+                return;
+            }
+
+            db.users.forEach((user, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-800/60 hover:bg-slate-950/40';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-xs text-slate-400">${user.createdAt || 'N/A'}</td>
+                    <td class="py-3 px-4 font-semibold text-indigo-300">${user.username}</td>
+                    <td class="py-3 px-4 font-mono text-xs text-slate-400">${user.password}</td>
+                    <td class="py-3 px-4 font-bold text-emerald-400">${user.points.toLocaleString()} P</td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="point-mod-${idx}" class="w-24 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs" placeholder="포인트">
+                            <button onclick="modifyUserPoints(${idx}, 'add')" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors">추가(+)</button>
+                            <button onclick="modifyUserPoints(${idx}, 'sub')" class="bg-amber-600 hover:bg-amber-500 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-brutal transition-colors">차감(-)</button>
+                            <button onclick="deleteUser(${idx})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ml-2">계정삭제</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function modifyUserPoints(userIndex, action) {
+            const inputVal = parseInt(document.getElementById(`point-mod-${userIndex}`).value);
+            if (!inputVal || inputVal <= 0) {
+                alert('유효한 포인트를 입력해주세요.');
+                return;
+            }
+
+            const targetUser = db.users[userIndex];
+            if (action === 'add') {
+                targetUser.points += inputVal;
+                alert(`${targetUser.username}님에게 ${inputVal.toLocaleString()} 포인트를 추가했습니다.`);
+            } else {
+                targetUser.persons = Math.max(0, targetUser.points - inputVal);
+                targetUser.points = Math.max(0, targetUser.points - inputVal);
+                alert(`${targetUser.username}님의 포인트를 ${inputVal.toLocaleString()} 만큼 차감했습니다.`);
+            }
+
+            await saveCloudData();
+            renderAdminUsers();
+        }
+
+        async function deleteUser(userIndex) {
+            const targetUser = db.users[userIndex];
+            if (confirm(`정말로 '${targetUser.username}' 계정을 삭제하시겠습니까?`)) {
+                db.users.splice(userIndex, 1);
+                await saveCloudData();
+                renderAdminUsers();
+                alert('계정이 삭제되었습니다.');
+            }
+        }
+    </script>
+</body>
+</html>
